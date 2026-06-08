@@ -61,11 +61,9 @@ Example:
 The reverse operation is called decoding:
 
 ```
-"Explain Kubernetes briefly"
-    ↓
-["Explain", " Kubernetes", " briefly"]
-    ↓
 [840, 20772, 26753]
+    ↓
+"Explain Kubernetes briefly"
 ```
 
 ---
@@ -116,11 +114,13 @@ Problems:
 # Tokenization is a compromise
 
 Tokenizer:
-
-text infinite text     ↓ finite vocabulary 
+```
+infinite text
+    ↓
+finite vocabulary
+```
 
 Key idea:
-
 # Tokenization = compression + standardization
 
 ---
@@ -129,16 +129,24 @@ Key idea:
 
 After tokenization:
 
-text token IDs 
+```
+token IDs 
+```
 
 are converted into:
 
-text dense vectors 
+```
+dense vectors 
+```
 
 Example:
 
-text 20772     ↓ [0.12, -0.55, 0.91, ...] 
+```
+20772
+    ↓
+[0.12, -0.55, 0.91, ...]
 
+```
 These vectors represent semantic meaning.
 
 Transformer models operate on vectors, not raw token IDs.
@@ -151,7 +159,9 @@ Token IDs themselves have no semantic meaning.
 
 Example:
 
-text 20772 
+```
+20772 
+```
 
 does NOT inherently mean:
 - Kubernetes
@@ -164,10 +174,15 @@ Embeddings place tokens into:
 
 Example intuition:
 
-text Kubernetes ↔ Docker (close vectors)  Kubernetes ↔ banana (far vectors) 
+```
+Kubernetes ↔ Docker
+(close vectors)
+
+Kubernetes ↔ banana
+(far vectors)
+```
 
 ---
-
 # 5. Transformer Forward Pass
 
 ## What is a forward pass?
@@ -177,12 +192,27 @@ A forward pass is:
 > Running the current token context through the Transformer model to predict the next token probabilities.
 
 Simplified flow:
-
-text Token IDs     ↓ Embeddings     ↓ Transformer Layers     ↓ Attention Computation     ↓ Feed Forward Networks     ↓ Logits     ↓ Probability Distribution 
+```
+Token IDs
+    ↓
+Embeddings
+    ↓
+Transformer Layers
+    ↓
+Attention Computation
+    ↓
+Feed Forward Networks
+    ↓
+Logits
+    ↓
+Probability Distribution
+```
 
 Output:
 
-text possible next tokens + probabilities 
+```
+possible next tokens + probabilities
+```
 
 ---
 
@@ -190,7 +220,9 @@ text possible next tokens + probabilities
 
 Input:
 
-text Explain Kubernetes briefly 
+```
+Explain Kubernetes briefly 
+```
 
 Model predicts:
 
@@ -204,11 +236,15 @@ Model samples one token.
 
 Example:
 
-text "K" 
+```
+"K"  
+```
 
 Then appends it to context:
 
-text Explain Kubernetes briefly K 
+```
+Explain Kubernetes briefly K 
+```
 
 Then repeats.
 
@@ -248,7 +284,13 @@ Including:
 
 Current context:
 
-text [Explain] [Kubernetes] [briefly] [K] [ubernetes] 
+```
+[Explain]
+[Kubernetes]
+[briefly]
+[K]
+[ubernetes]
+```
 
 When generating the next token:
 
@@ -268,17 +310,23 @@ The model dynamically decides:
 
 Prompt:
 
-text The capital of France is 
+```
+The capital of France is
+```
 
 When generating next token:
 
 attention focuses heavily on:
 
-text France 
+```
+France
+``` 
 
 instead of:
 
-text The 
+```
+The
+```
 
 ---
 
@@ -300,7 +348,29 @@ Each token generates:
 
 # Attention / QKV Flow
 
-text Current Token     ↓ Generate Query Vector  Previous Tokens     ↓ Generate Key Vectors     ↓ Generate Value Vectors  Query + Keys     ↓ Attention Score Computation     ↓ Attention Weights  Attention Weights + Values     ↓ Weighted Combination     ↓ Context-Aware Representation 
+```
+Current Token
+    ↓
+Generate Query Vector
+
+Previous Tokens
+    ↓
+Generate Key Vectors
+    ↓
+Generate Value Vectors
+
+Query + Keys
+    ↓
+Attention Score Computation
+    ↓
+Attention Weights
+
+Attention Weights + Values
+    ↓
+Weighted Combination
+    ↓
+Context-Aware Representation
+```
 
 ---
 
@@ -332,7 +402,9 @@ The model statistically learns patterns from massive datasets.
 
 Prompt:
 
-text The capital of France is 
+```
+The capital of France is 
+``` 
 
 The model learns through training that:
 - "capital" often attends to countries
@@ -378,7 +450,23 @@ Because:
 
 # KV Cache Runtime Flow
 
-text Current Context     ↓ Reuse Existing KV Cache     ↓ Compute New Token Q/K/V     ↓ Attention     ↓ Generate Next Token     ↓ Append New K/V To Cache     ↓ Append Token To Context     ↓ Repeat 
+```
+Current Context
+    ↓
+Reuse Existing KV Cache
+    ↓
+Compute New Token Q/K/V
+    ↓
+Attention
+    ↓
+Generate Next Token
+    ↓
+Append New K/V To Cache
+    ↓
+Append Token To Context
+    ↓
+Repeat
+```
 
 ---
 
@@ -405,13 +493,28 @@ With streaming:
 
 Example:
 
-json {"response":"K"} {"response":"ubernetes"} {"response":" is"} 
+```
+JSON
+{"response":"K"}
+{"response":"ubernetes"}
+{"response":" is"}
+```
 
 ---
 
 # Streaming Flow
 
-text Generate Token     ↓ Decode Token     ↓ Send Token To Client     ↓ Append Token To Context     ↓ Repeat 
+```
+Generate Token
+    ↓
+Decode Token
+    ↓
+Send Token To Client
+    ↓
+Append Token To Context
+    ↓
+Repeat
+```
 
 ---
 
@@ -461,7 +564,9 @@ Transformers are dominated by:
 
 Example:
 
-text A × B 
+```
+A × B
+``` 
 
 ---
 
@@ -479,7 +584,24 @@ Originally built for:
 
 # GPU vs CPU
 
-text CPU     ↓ Few Powerful Cores     ↓ Complex Logic / Branching / Sequential Tasks   GPU     ↓ Thousands Of Small Cores     ↓ Massive Parallel Math     ↓ Matrix Multiplication     ↓ High Throughput 
+```
+CPU
+    ↓
+Few Powerful Cores
+    ↓
+Complex Logic / Branching / Sequential Tasks
+
+
+GPU
+    ↓
+Thousands Of Small Cores
+    ↓
+Massive Parallel Math
+    ↓
+Matrix Multiplication
+    ↓
+High Throughput
+```
 
 ---
 
@@ -556,7 +678,9 @@ Focus:
 
 Analogy:
 
-text Docker Desktop for LLMs 
+```
+Docker Desktop for LLMs  
+```
 
 ---
 
@@ -569,7 +693,9 @@ Focus:
 
 Analogy:
 
-text high-performance inference runtime 
+```
+high-performance inference runtime
+``` 
 
 ---
 
@@ -596,7 +722,19 @@ Better:
 
 # Traditional batching
 
-text Incoming Requests     ↓ Form Static Batch     ↓ Run Batch On GPU     ↓ Short Requests Finish Early     ↓ GPU Slots Become Idle     ↓ Must Wait For Longest Request 
+```
+Incoming Requests
+    ↓
+Form Static Batch
+    ↓
+Run Batch On GPU
+    ↓
+Short Requests Finish Early
+    ↓
+GPU Slots Become Idle
+    ↓
+Must Wait For Longest Request
+```
 
 Problem:
 - short requests finish early
@@ -624,7 +762,21 @@ Use:
 
 # Continuous Batching Flow
 
-text Incoming Requests     ↓ Dynamic Batch Scheduler     ↓ Run Token Step On GPU     ↓ Some Requests Finish     ↓ Immediately Insert New Requests     ↓ Keep GPU Fully Utilized     ↓ Repeat 
+```
+Incoming Requests
+    ↓
+Dynamic Batch Scheduler
+    ↓
+Run Token Step On GPU
+    ↓
+Some Requests Finish
+    ↓
+Immediately Insert New Requests
+    ↓
+Keep GPU Fully Utilized
+    ↓
+Repeat
+```
 
 ---
 
@@ -643,11 +795,15 @@ not:
 
 Traditional batching:
 
-text run fixed jobs 
+```
+run fixed jobs
+``` 
 
 Continuous batching:
 
-text modern scheduler 
+```
+modern scheduler
+``` 
 
 with:
 - dynamic insertion
@@ -674,7 +830,20 @@ This causes:
 
 # Fragmentation Flow
 
-text |AA|BBBB|CCC|     ↓  Request B Finishes  |AA|____|CCC|     ↓  Fragmented Free Space     ↓  Large Request Cannot Fit 
+```
+|AA|BBBB|CCC|
+    ↓
+
+Request B Finishes
+
+|AA|____|CCC|
+    ↓
+
+Fragmented Free Space
+    ↓
+
+Large Request Cannot Fit
+```
 
 ---
 
@@ -690,17 +859,33 @@ vLLM solves fragmentation using:
 
 Instead of:
 
-text one request = one large memory block 
+```
+one request = one large memory block
+``` 
 
 Use:
 
-text request = many small pages 
+```
+request = many small pages
+``` 
 
 ---
 
 # PagedAttention Flow
 
-text KV Cache     ↓ Split Into Small Pages     ↓ Pages Stored Non-Contiguously     ↓ Requests Reuse Free Fragments     ↓ Reduced Fragmentation     ↓ Enables Continuous Batching 
+```
+KV Cache
+    ↓
+Split Into Small Pages
+    ↓
+Pages Stored Non-Contiguously
+    ↓
+Requests Reuse Free Fragments
+    ↓
+Reduced Fragmentation
+    ↓
+Enables Continuous Batching
+```
 
 ---
 
@@ -731,7 +916,21 @@ Modern inference servers increasingly behave like:
 
 # Inference Server Responsibilities
 
-text Inference Server     ↓ Request Scheduling     ↓ KV Cache Management     ↓ GPU Memory Management     ↓ Continuous Batching     ↓ Streaming Responses     ↓ GPU Utilization Optimization 
+```
+Inference Server
+    ↓
+Request Scheduling
+    ↓
+KV Cache Management
+    ↓
+GPU Memory Management
+    ↓
+Continuous Batching
+    ↓
+Streaming Responses
+    ↓
+GPU Utilization Optimization
+```
 
 ---
 
@@ -769,7 +968,35 @@ The most important takeaway:
 
 # End-to-End Runtime Pipeline
 
-text Raw Text     ↓ Tokenizer     ↓ Tokens     ↓ Embeddings     ↓ Transformer     ↓ Attention     ↓ QKV     ↓ KV Cache     ↓ Next Token Prediction     ↓ Sampling     ↓ Streaming     ↓ Client Response     ↓ Append To Context     ↓ Repeat 
+```
+Raw Text
+    ↓
+Tokenizer
+    ↓
+Tokens
+    ↓
+Embeddings
+    ↓
+Transformer
+    ↓
+Attention
+    ↓
+QKV
+    ↓
+KV Cache
+    ↓
+Next Token Prediction
+    ↓
+Sampling
+    ↓
+Streaming
+    ↓
+Client Response
+    ↓
+Append To Context
+    ↓
+Repeat
+```
 
 ---
 
