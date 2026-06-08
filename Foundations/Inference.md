@@ -85,6 +85,15 @@ text "Kubernetes" → ["K", "ubernetes"]
 
 text "Hello world" → ["Hello", " world"] 
 
+Important:
+
+These are conceptual examples.
+
+Actual token splits depend on:
+- the specific tokenizer
+- the vocabulary
+- the model family
+
 ---
 
 # Why not use characters?
@@ -224,13 +233,15 @@ Input:
 Explain Kubernetes briefly 
 ```
 
-Model predicts:
+Model predicts this kind of probability distribution:
 
 | Token | Probability |
 |---|---|
 | "K" | 20% |
 | "It" | 10% |
 | "The" | 8% |
+
+These probability numbers are illustrative, not real model outputs.
 
 Model samples one token.
 
@@ -446,6 +457,18 @@ Because:
 - previous token K/V values do not change
 - they can be reused
 
+Q is different.
+
+Each new token only needs:
+
+# its own current Query
+
+to attend over:
+
+# all historical Keys and Values
+
+Historical Q values are not reused in later decode steps, so caching Q does not help.
+
 ---
 
 # KV Cache Runtime Flow
@@ -478,6 +501,33 @@ Longer context means:
 - larger KV cache
 - more memory usage
 - higher latency
+
+---
+
+# Multi-Head Attention Variants
+
+KV cache size depends heavily on:
+
+# how many K/V heads the model stores
+
+Common variants:
+
+| Variant | Idea | KV Cache Impact |
+|---|---|---|
+| MHA | Each query head has its own K/V heads | largest KV cache |
+| MQA | Many query heads share one K/V head | much smaller KV cache |
+| GQA | Groups of query heads share K/V heads | middle ground |
+
+GQA is common in modern LLMs such as Llama-family models.
+
+Key idea:
+
+# Sharing K/V heads reduces KV cache memory.
+
+This improves:
+- memory efficiency
+- max batch size
+- decode throughput
 
 ---
 
@@ -659,7 +709,57 @@ heavily rely on CUDA.
 
 ---
 
-# 12. Ollama vs vLLM
+# 12. Quantization
+
+## Why quantization matters
+
+LLM inference is often limited by:
+- GPU memory capacity
+- GPU memory bandwidth
+
+Quantization reduces the number of bits used to store model weights.
+
+---
+
+# Common numeric formats
+
+| Format | Common Use |
+|---|---|
+| FP32 | training baseline / high precision |
+| FP16 | common inference format |
+| BF16 | common training + inference format |
+| FP8 | newer high-throughput inference/training format |
+| INT8 | smaller, faster inference |
+| INT4 | much smaller model weights |
+
+---
+
+# Why it helps
+
+Smaller weights mean:
+- lower VRAM usage
+- less memory bandwidth pressure
+- potentially higher throughput
+- ability to run larger models on the same GPU
+
+---
+
+# Tradeoff
+
+Quantization can reduce quality if done poorly.
+
+Common techniques:
+- GPTQ
+- AWQ
+- smooth quantization methods
+
+Key idea:
+
+# Quantization trades precision for efficiency.
+
+---
+
+# 13. Ollama vs vLLM
 
 Both are:
 
@@ -709,7 +809,157 @@ high-performance inference runtime
 
 ---
 
-# 13. Batching
+# 14. Prefill vs Decode
+
+LLM inference has two very different phases:
+
+# prefill
+
+and:
+
+# decode
+
+This is one of the most important runtime distinctions.
+
+---
+
+# Prefill phase
+
+Prefill processes the input prompt.
+
+```
+Prompt Tokens
+    ↓
+Process Many Tokens In Parallel
+    ↓
+Build Initial KV Cache
+    ↓
+Generate First Token
+```
+
+Prefill characteristics:
+- processes the whole prompt at once
+- uses large matrix multiplications
+- tends to be compute-bound
+- strongly affects first-token latency
+
+Compute-bound means:
+
+# GPU math throughput is the main bottleneck.
+
+---
+
+# Decode phase
+
+Decode generates output tokens one at a time.
+
+```
+Current Token
+    ↓
+Use Existing KV Cache
+    ↓
+Generate Next Token
+    ↓
+Append New K/V
+    ↓
+Repeat
+```
+
+Decode characteristics:
+- one token step at a time
+- repeatedly reads KV cache from GPU memory
+- tends to be memory-bound
+- strongly affects output token latency
+
+Memory-bound means:
+
+# GPU memory bandwidth is the main bottleneck.
+
+---
+
+# Why this matters
+
+Different phases need different optimizations:
+
+| Phase | Main Bottleneck | Common Focus |
+|---|---|---|
+| Prefill | compute | batching long prompts |
+| Decode | memory bandwidth | KV cache efficiency + scheduling |
+
+This is why inference systems often optimize:
+- prefill throughput
+- decode throughput
+- prefill/decode scheduling separately
+
+---
+
+# 15. Inference Performance Metrics
+
+Production inference needs quantitative language.
+
+Important metrics:
+
+| Metric | Meaning | Mostly Affected By |
+|---|---|---|
+| TTFT | time to first token | prefill |
+| TPOT | time per output token | decode |
+| ITL | inter-token latency | decode |
+| Throughput | tokens or requests per second | batching + GPU utilization |
+
+---
+
+# TTFT
+
+TTFT means:
+
+# Time To First Token
+
+It measures how long the user waits before seeing the first streamed token.
+
+TTFT is heavily affected by:
+- prompt length
+- prefill scheduling
+- queueing delay
+- model size
+
+---
+
+# TPOT / ITL
+
+TPOT means:
+
+# Time Per Output Token
+
+ITL means:
+
+# Inter-Token Latency
+
+They measure how quickly tokens appear after generation starts.
+
+They are heavily affected by:
+- decode efficiency
+- KV cache size
+- memory bandwidth
+- continuous batching
+
+---
+
+# Latency vs throughput
+
+There is usually a tradeoff:
+
+| Optimize For | Effect |
+|---|---|
+| Lower latency | smaller batches, less waiting |
+| Higher throughput | larger batches, better GPU utilization |
+
+Key idea:
+
+# Serving is scheduling under constraints.
+
+---
+
+# 16. Batching
 
 ## Why batching matters
 
@@ -742,7 +992,7 @@ Problem:
 
 ---
 
-# 14. Continuous Batching
+# 17. Continuous Batching
 
 vLLM introduced:
 
@@ -789,6 +1039,12 @@ Continuous batching is:
 not:
 # request-level scheduling
 
+More precisely:
+
+# continuous batching mainly schedules decode token steps.
+
+Prefill can also be batched, but decode is where token-by-token scheduling becomes essential.
+
 ---
 
 # OS analogy
@@ -812,7 +1068,7 @@ with:
 
 ---
 
-# 15. Memory Fragmentation
+# 18. Memory Fragmentation
 
 ## Problem
 
@@ -847,7 +1103,7 @@ Large Request Cannot Fit
 
 ---
 
-# 16. PagedAttention
+# 19. PagedAttention
 
 vLLM solves fragmentation using:
 
@@ -880,7 +1136,7 @@ Split Into Small Pages
     ↓
 Pages Stored Non-Contiguously
     ↓
-Requests Reuse Free Fragments
+Logical KV Blocks Map To Physical Pages
     ↓
 Reduced Fragmentation
     ↓
@@ -903,10 +1159,28 @@ PagedAttention is essentially:
 - reduced fragmentation
 - dynamic request scheduling
 - enables continuous batching
+- prefix sharing across requests with the same prompt prefix
 
 ---
 
-# 17. AI Inference Servers ≈ GPU Operating Systems
+# Prefix sharing
+
+Some requests share the same prefix.
+
+Examples:
+- same system prompt
+- same few-shot examples
+- same chat template
+
+PagedAttention can let requests share physical KV pages for the shared prefix.
+
+Key idea:
+
+# identical prefixes do not need duplicate KV cache memory.
+
+---
+
+# 20. AI Inference Servers ≈ GPU Operating Systems
 
 Modern inference servers increasingly behave like:
 
@@ -958,7 +1232,106 @@ Inference servers now handle:
 
 ---
 
-# 18. Core Mental Model
+# 21. Inference On Kubernetes
+
+Kubernetes is commonly used to run inference services, but GPUs behave differently from CPU and memory.
+
+---
+
+# GPU scheduling basics
+
+Kubernetes discovers NVIDIA GPUs through:
+
+# NVIDIA device plugin
+
+The device plugin advertises GPUs as extended resources:
+
+```
+nvidia.com/gpu: 1
+```
+
+Pods request GPUs explicitly.
+
+The scheduler then places pods on nodes with available GPU capacity.
+
+---
+
+# GPU Operator
+
+NVIDIA GPU Operator helps manage the GPU software stack on Kubernetes:
+- drivers
+- container runtime integration
+- device plugin
+- DCGM monitoring
+- MIG configuration
+
+Key idea:
+
+# device plugin exposes GPUs; GPU Operator manages the GPU node stack.
+
+---
+
+# Why GPUs cannot be oversold like CPUs
+
+CPU can be time-shared naturally.
+
+GPU memory cannot be safely oversold in the same way.
+
+Problems:
+- model weights must fit in VRAM
+- KV cache grows dynamically
+- GPU OOM usually kills work
+- memory bandwidth is a hard bottleneck
+
+So GPU scheduling often needs stricter capacity planning.
+
+---
+
+# GPU sharing options
+
+| Option | What It Does | Best For |
+|---|---|---|
+| MIG | hardware partitions one GPU into isolated slices | stronger isolation |
+| Time-slicing | multiple pods take turns on the same GPU | bursty/light workloads |
+| MPS | CUDA-level multi-process sharing | better concurrent kernel execution |
+
+Tradeoff:
+
+# sharing improves utilization but weakens isolation.
+
+---
+
+# Platform serving layer
+
+Common Kubernetes-native serving layers:
+- KServe
+- Ray Serve
+- Knative
+
+They help with:
+- deployment
+- autoscaling
+- routing
+- revisions
+- model serving lifecycle
+
+But the low-level GPU efficiency usually still depends on:
+- vLLM
+- TensorRT-LLM
+- TGI
+- SGLang
+
+Platform layer:
+
+# manages services and scale.
+
+Inference runtime:
+
+# manages tokens, memory, and GPU execution.
+
+---
+
+# 22. Core Mental Model
 
 The most important takeaway:
 
@@ -977,15 +1350,17 @@ Tokens
     ↓
 Embeddings
     ↓
-Transformer
+Prefill
     ↓
-Attention
+Build Initial KV Cache
     ↓
-QKV
+First Token
     ↓
-KV Cache
+Decode Loop
     ↓
-Next Token Prediction
+Current Q Attends To Historical K/V
+    ↓
+Next Token Probability
     ↓
 Sampling
     ↓
@@ -1010,7 +1385,10 @@ Core concerns:
 - GPU utilization
 - scheduling
 - memory management
+- KV cache efficiency
+- quantization
 - serving systems
+- Kubernetes GPU orchestration
 - distributed inference
 - runtime optimization
 
